@@ -1,4 +1,4 @@
-"""Pipeline toolkit: panel localization and cropping."""
+""" YOLO inference - sign localization and cropping."""
 
 from pathlib import Path
 import cv2

@@ -66,12 +66,12 @@ offsider/
 
 Model weight binaries (.pt) are tracked outside of Git.
 
-1. Download the latest trained checkpoint from our releases.
+1. Download the latest trained checkpoint from our [latest pre-release](https://github.com/offsider-labs/offsider/releases/).
 2. Place the weights file inside `models/` directory:
 
-```
+```bash
 mkdir -p models
-mv /path/to/weights.pt models/best.pt
+mv ~/Downloads/best.pt models/best.pt
 ```
 
 ## Usage

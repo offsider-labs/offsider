@@ -12,7 +12,11 @@ Offsider pairs object detection with optical character recognition (OCR) to fram
 
 ## Architecture Pipeline
 
-![alt text](image-2.png)
+<p align="center">
+  <img src="docs/assets/flow-diagram.png" alt="Offsider Architecture Flow" width="700">
+  <br>
+  <em>Figure 1: High-level system flow diagram (work-in-progress prototype).</em>
+</p>
 
 ---
 

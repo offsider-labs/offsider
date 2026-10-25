@@ -8,5 +8,8 @@ models/
 runs/
 *.pt
 
+__pycache__/
+.pytest_cache/
+*.pyc
 *.cache
 .DS_Store

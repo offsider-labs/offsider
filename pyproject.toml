@@ -8,8 +8,11 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "easyocr>=1.7.2",
     "python-dotenv>=1.2.4",
     "roboflow>=1.7.1",
+    "streamlit>=1.66.1",
+    "streamlit-webrtc>=0.79.0",
     "ultralytics>=8.4.175",
 ]
 
@@ -23,4 +26,9 @@ package = false
 [dependency-groups]
 dev = [
     "ipykernel>=7.4.0",
+    "pytest>=8.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

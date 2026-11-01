@@ -1,0 +1,39 @@
+file,split,width,height,expected_text,notes
+IMG_1139_panel1.jpg,train,576,580,CLEARWAY | SPECIAL EVENTS | 6AM-7PM | SAT 26 SEP | SAT 10 OCT | SAT 9 NOV,time sits beside the dates; 7PM partly covered
+IMG_1156_panel1.jpg,train,715,459,,skip: two signs in one box (TRUCK ZONE + LOADING ZONE)
+IMG_1156_panel2.jpg,train,486,777,P | MOTOR | BIKES | ONLY,
+IMG_1156_panel3.jpg,train,363,702,4P | TICKET | 6PM-10PM | MON-FRI | 12:30PM-10PM | SAT | 8AM-10PM | SUN | PERMIT HOLDERS | EXCEPTED AREA B2,top edge shows part of the sign above
+IMG_1167_panel1.jpg,train,283,130,6AM-9:30AM | MON-FRI,blurry; no-parking symbol
+IMG_1167_panel2.jpg,train,149,284,1P | 9:30AM-6PM | MON-FRI | PERMIT | HOLDERS | EXCEPTED | AREA 6,blurry; check AREA 6 vs AREA G
+IMG_1167_panel3.jpg,train,139,275,NO | STOPPING,very faded
+IMG_1170_panel1.jpg,train,526,222,3PM-7PM | MON-FRI | CLEARWAY,
+IMG_1170_panel2.jpg,train,281,532,NO | STOPPING,
+IMG_1170_panel3.jpg,train,275,266,LOADING | ZONE | 8:30AM-3PM | MON-FRI,
+IMG_1170_panel4.jpg,train,283,276,4P 1/4P | FREE | TICKET | 7PM-12AM | MON-FRI | 8AM-12AM | SAT-SUN | & PUBLIC HOLIDAYS,1/4P FREE box sits beside 4P; check line split
+IMG_1179_panel1.jpg,train,152,478,LOADING | ZONE | 8:30AM-6PM | MON-FRI | 8:30AM-12:30PM | SAT,"narrow, angled"
+IMG_1179_panel2.jpg,train,144,442,NO | STOPPING,"angled, edge cut off"
+IMG_1180_panel1.jpg,train,480,236,6AM-10AM | MON-FRI | CLEARWAY,blurry
+IMG_1180_panel2.jpg,train,504,257,3:30PM-6PM | MON-FRI,blurry; no-parking symbol
+IMG_1180_panel3.jpg,train,247,260,,skip: too blurry to read the times
+IMG_1180_panel4.jpg,train,250,249,,skip: too blurry to read the times
+IMG_1180_panel5.jpg,train,247,268,,skip: too blurry to read the times
+IMG_1180_panel6.jpg,train,257,279,,skip: too blurry to read the times
+IMG_1221_panel1.jpg,train,467,441,NO STOPPING | 6PM-11PM | WENTWORTH PARK | RACE DAYS,angled; bottom shows part of another NO STOPPING sign
+IMG_1221_panel2.jpg,train,225,670,1P | TICKET | 8AM-6PM,top edge shows part of the sign above
+IMG_1221_panel3.jpg,train,277,744,NO | STOPPING,top edge shows part of the sign beside it
+IMG_1463_panel1.jpg,train,690,409,6AM-10AM | 3PM-7PM | MON-FRI | CLEARWAY,
+IMG_1463_panel2.jpg,train,362,808,ALL OTHER | TIMES,no-parking symbol
+IMG_1507_panel1.jpg,train,191,415,LOADING | ZONE,
+IMG_1529_panel1.jpg,train,235,523,LOADING | ZONE | 15 MINUTES | 7:30AM-7:30PM | MON-FRI,
+IMG_1530_panel1.jpg,train,234,430,NO | STOPPING,
+IMG_1531_panel1.jpg,train,378,726,NO | STOPPING,
+IMG_1157_panel1.jpg,valid,625,542,,skip: two signs in one box (TRUCK ZONE + LOADING ZONE)
+IMG_1157_panel2.jpg,valid,401,857,4P | TICKET | 6PM-10PM | MON-FRI | 12:30PM-10PM | SAT | 8AM-10PM | SUN | PERMIT HOLDERS | EXCEPTED AREA B2,top edge shows part of the sign above
+IMG_1157_panel3.jpg,valid,309,745,NO | STOPPING,
+IMG_1282_panel1.jpg,valid,536,270,LOADING | ZONE | 7:30AM-9:30AM | MON-FRI,
+IMG_1282_panel2.jpg,valid,312,594,1P | METER | 9:30AM-6PM | MON-FRI,
+IMG_1282_panel3.jpg,valid,292,563,NO | STOPPING,
+IMG_1528_panel1.jpg,valid,513,1032,LOADING | ZONE | 15 MINUTES | 7:30AM-7:30PM | MON-FRI,
+IMG_1192_panel1.jpg,test,460,569,LOADING ZONE | 7AM-12 MIDDAY | MON-SAT,check MIDDAY (small text)
+IMG_1192_panel2.jpg,test,224,1031,P10 | MINUTES | 6PM-MIDNIGHT | MON-SAT,narrow
+IMG_1506_panel1.jpg,test,138,308,LOADING | ZONE,

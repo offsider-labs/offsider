@@ -64,16 +64,21 @@ with ocr_tab:
         "Upload or take a photo of a parking sign",
         type=["jpg", "jpeg", "png"],
     )
+    # Lets OCR be tested on its own, e.g. on hand-cropped panels, while the detector is still in progress
+    skip_detector = st.checkbox("Skip detector (read the whole photo)")
 
     if photo is not None:
         img = cv2.imdecode(np.frombuffer(photo.getvalue(), np.uint8), cv2.IMREAD_COLOR)
 
-        detector = load_detector()
-        crops = detector.detect_and_crop(img) if detector.model is not None else []
+        crops = []
+        if not skip_detector:
+            detector = load_detector()
+            crops = detector.detect_and_crop(img) if detector.model is not None else []
 
         if not crops:
-            # No weights, or YOLO found nothing: still useful to see what OCR makes of the photo
-            st.caption("No sign detected (or no YOLO weights in models/), so reading the whole photo.")
+            # Skipped, no weights, or YOLO found nothing: still useful to see what OCR makes of the photo
+            if not skip_detector:
+                st.caption("No sign detected (or no YOLO weights in models/), so reading the whole photo.")
             h, w = img.shape[:2]
             crops = [(img, {"confidence": 1.0, "bbox": [0, 0, w, h], "whole_photo": True})]
 

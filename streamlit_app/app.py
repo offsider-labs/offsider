@@ -50,8 +50,8 @@ with live_tab:
             "video": {
                 # Prefer the phone's rear camera.
                 "facingMode": {"ideal": "environment"},
-                "width": {"ideal": 640},
-                "height": {"ideal": 480},
+                "width": {"ideal": 1280},
+                "height": {"ideal": 720},
             },
             "audio": False,
         },

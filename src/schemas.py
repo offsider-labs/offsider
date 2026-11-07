@@ -17,6 +17,7 @@ class RestrictionType(str, Enum):
     TICKET_PARKING = "TICKET"
     CLEARWAY = "CLEARWAY"
     NO_STOPPING = "NO_STOPPING"
+    NO_PARKING = "NO_PARKING"
     PERMIT_ZONE = "PERMIT"
 
 
@@ -50,3 +51,4 @@ class ClearanceVerdict(BaseModel):
     reason: str
     max_stay_minutes: Optional[int] = None
     warning: Optional[str] = None
+    rules: List[ParkingRule] = Field(default_factory=list)

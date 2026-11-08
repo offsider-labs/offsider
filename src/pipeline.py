@@ -6,6 +6,7 @@ Edge SDK for dashcam parking sign detection and NSW kerbside compliance.
 
 from datetime import datetime, time
 import time as time_module
+from pathlib import Path
 from typing import List, Optional, Tuple
 import cv2
 import numpy as np
@@ -23,12 +24,16 @@ GREEN = (0, 200, 0)
 RED = (0, 0, 220)
 AMBER = (0, 165, 255)
 
+# Resolved from this file rather than the working directory, so the weights are found
+# however the app is launched (locally or on Streamlit Cloud)
+DEFAULT_WEIGHTS = str(Path(__file__).resolve().parent.parent / "models" / "best.pt")
+
 # Models are slow to load, so each is created on first use and then reused
 _detector: Optional[SignDetector] = None
 _reader: Optional[SignReader] = None
 
 
-def get_detector(conf_threshold: Optional[float] = None, weights_path: Optional[str] = "models/best.pt") -> SignDetector:
+def get_detector(conf_threshold: Optional[float] = None, weights_path: Optional[str] = DEFAULT_WEIGHTS) -> SignDetector:
     """Returns cached SignDetector instance, optionally updating confidence threshold."""
     global _detector
     if _detector is None:

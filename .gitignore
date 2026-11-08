@@ -4,9 +4,12 @@
 .venv/
 
 data/
-models/
 runs/
 *.pt
+
+# The deployed app loads models/best.pt, so that one file is committed (~5 MB)
+models/*
+!models/best.pt
 
 __pycache__/
 .pytest_cache/

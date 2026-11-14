@@ -93,7 +93,7 @@ offsider/
 # Getting Started
 
 ### Prerequisites
-  - Python 3.12 or higher
+  - Python 3.12 (recommended) or 3.13
   - Git
 
 ### Installation
@@ -122,7 +122,19 @@ mv ~/Downloads/best.pt models/best.pt
 
 ### Running the Interactive UI
 
-`streamlit run steamlit_app/app.py`
+`streamlit run streamlit_app/app.py`
+
+### Deploying to Streamlit Community Cloud
+
+Use `main` as the branch and `streamlit_app/app.py` as the entry point.
+Before deploying, open **Advanced settings** and select **Python 3.12**.
+PaddlePaddle requires Python below 3.14 for the versions used here.
+The repository's `.python-version` configures local tooling; Cloud's Python
+version must be selected in the deployment settings.
+
+If an existing deployment uses Python 3.14, save its secrets and settings,
+then delete and redeploy the app with Python 3.12. Rebooting the app or pushing
+dependency changes does not change its Python runtime.
 
 ## Contributors & Team
 

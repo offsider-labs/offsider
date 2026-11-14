@@ -1,5 +1,7 @@
 # Used by Streamlit Community Cloud, which reads this file instead of pyproject.toml.
 # Keep in sync with what src/ and streamlit_app/ import.
+# Deploy with Python 3.12 in Streamlit Cloud's Advanced settings. PaddlePaddle
+# does not provide Python 3.14 wheels; .python-version does not set Cloud's runtime.
 
 # CPU-only PyTorch: the default Linux wheels bundle CUDA (several GB) and break the deploy
 --extra-index-url https://download.pytorch.org/whl/cpu

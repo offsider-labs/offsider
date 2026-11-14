@@ -1,5 +1,6 @@
-""" EasyOCR - text extraction from cropped sign panels."""
+"""Text extraction from cropped sign panels, with PaddleOCR (default) or EasyOCR."""
 
+import os
 import re
 
 import cv2
@@ -9,6 +10,21 @@ try:
     import easyocr
 except ImportError:
     easyocr = None
+
+# Skips PaddleX's network check of its model hosts on every start. Must be set before
+# paddleocr is imported. The models still download once on first use (to ~/.paddlex/).
+os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+
+try:
+    import paddleocr
+except ImportError:
+    paddleocr = None
+
+# Which OCR engine SignReader uses. PaddleOCR read words and times better than EasyOCR on
+# both labelled crop sets (scripts/eval_cleanup.py). EasyOCR is kept as a fallback, chosen
+# with SignReader(engine="easyocr") or the OFFSIDER_OCR_ENGINE environment variable.
+ENGINES = ("paddle", "easyocr")
+DEFAULT_ENGINE = os.environ.get("OFFSIDER_OCR_ENGINE", "paddle")
 
 
 # Crops shorter than this are upscaled before OCR. Panel crops are usually
@@ -96,6 +112,32 @@ _SPLIT_HOUR_MINUTES = re.compile(r"\b(1[0-2]|[1-9]) (00|15|30|45)(?=AM\b|PM\b|-)
 _TIME = r"\d{1,2}(?::\d{2})?(?:AM|PM)"
 _TIME_PAIR = re.compile(rf"\b({_TIME}) ({_TIME})\b")
 
+# A range whose start lost its AM/PM, e.g. "7:30-7:30PM" (OCR often misses the small AM/PM).
+# Both AM and PM are tried for the start, and one is filled in only when the other is
+# implausible for a parking sign (see _fill_start_meridiem). "6-10PM" stays as it is, since
+# 6AM-10PM and 6PM-10PM are both real signs.
+_CLOCK = r"(1[0-2]|[1-9])(?::(00|15|30|45))?"
+_MISSING_START_MERIDIEM = re.compile(rf"(?<![\d:]){_CLOCK}-{_CLOCK}(AM|PM)\b")
+
+# Longest restriction a sign's time range covers. Longer readings are treated as misreads:
+# "12:30-10PM" can't be 12:30AM-10PM (21.5 hours), so it's 12:30PM-10PM.
+MAX_RANGE_HOURS = 18
+
+# --- Clean-up for how PaddleOCR reads times ---
+# "TO" between two times means a range: "1AM TO 12 MIDDAY" -> "1AM-12 MIDDAY"
+_TO_RANGE = re.compile(r"(?<=\d)(AM|PM)? TO (?=\d)")
+# Doubled dashes: "6AM--10AM" -> "6AM-10AM"
+_MULTI_DASH = re.compile(r"-{2,}")
+# Stray dots or commas between a number and a dash: "8.-10" -> "8-10"
+_PUNCT_BEFORE_DASH = re.compile(r"(?<=\d)[.,;]+(?=-)")
+
+# --- Times that couldn't be read cleanly ---
+# A finished range: both ends have AM/PM (or are MIDNIGHT / 12 MIDDAY)
+_VALID_END = r"(?:\d{1,2}(?::\d{2})?(?:AM|PM)|MIDNIGHT|12 MIDDAY)"
+_VALID_RANGE = re.compile(rf"\b\d{{1,2}}(?::\d{{2}})?(?:AM|PM)-{_VALID_END}(?![\w:])")
+# A single time with AM/PM, which on a sign should always be one end of a range
+_LONE_TIME = re.compile(r"\d{1,2}(?::\d{2})?(?:AM|PM)")
+
 
 class SignReader:
     def __init__(
@@ -104,15 +146,35 @@ class SignReader:
         min_conf: float = 0.2,
         gpu: bool = False,
         readtext_options: dict | None = None,
+        engine: str | None = None,
     ):
-        if easyocr is None:
-            raise ImportError("easyocr is not installed. Run `uv sync`.")
-
+        """
+        engine: "paddle" or "easyocr" (default: DEFAULT_ENGINE).
+        languages, gpu and readtext_options only apply to EasyOCR; PaddleOCR runs its
+        English models on the CPU.
+        """
+        self.engine = engine or DEFAULT_ENGINE
+        if self.engine not in ENGINES:
+            raise ValueError(f"Unknown OCR engine {self.engine!r}, expected one of {ENGINES}")
         self.min_conf = min_conf
-        # Settings passed to EasyOCR's readtext(), e.g. low_text, mag_ratio, width_ths
-        self.readtext_options = {**READTEXT_OPTIONS, **(readtext_options or {})}
-        # Loading the model is slow, so it is done once and reused for every frame
-        self.reader = easyocr.Reader(list(languages), gpu=gpu)
+
+        # Loading a model is slow, so it is done once and reused for every frame
+        if self.engine == "paddle":
+            if paddleocr is None:
+                raise ImportError("paddleocr is not installed. Run `uv sync`.")
+            # The orientation and unwarping steps are for scanned pages; sign crops are upright
+            self.reader = paddleocr.PaddleOCR(
+                lang="en",
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+            )
+        else:
+            if easyocr is None:
+                raise ImportError("easyocr is not installed. Run `uv sync`.")
+            # Settings passed to EasyOCR's readtext(), e.g. low_text, mag_ratio, width_ths
+            self.readtext_options = {**READTEXT_OPTIONS, **(readtext_options or {})}
+            self.reader = easyocr.Reader(list(languages), gpu=gpu)
 
     def read(self, crops: list[tuple[np.ndarray, dict]]) -> list[dict]:
         """
@@ -121,8 +183,9 @@ class SignReader:
         Returns one dict per crop, in the same order:
             bbox: sign location in the original frame (from the detector)
             lines: normalised text lines, top to bottom
-            raw: per-piece EasyOCR output (text, conf, box in crop coordinates)
+            raw: per-piece OCR output (text, conf, box in crop coordinates)
             mean_conf: average OCR confidence, 0.0 if nothing was read
+            unclear_times: times that couldn't be read cleanly (see find_unclear_times)
         """
         results: list[dict] = []
 
@@ -138,18 +201,30 @@ class SignReader:
                 "lines": lines,
                 "raw": pieces,
                 "mean_conf": float(np.mean(confs)) if confs else 0.0,
+                "unclear_times": find_unclear_times(lines),
             })
 
         return results
 
     def _run_ocr(self, img: np.ndarray, scale: float, offset: int = 0) -> list[dict]:
         """
-        Runs EasyOCR and drops low-confidence pieces. Boxes are mapped back to crop
+        Runs the OCR engine and drops low-confidence pieces. Boxes are mapped back to crop
         coordinates by removing the border offset, then undoing the upscale.
         """
         pieces: list[dict] = []
 
-        for box, text, conf in self.reader.readtext(img, **self.readtext_options):
+        if self.engine == "paddle":
+            # PaddleOCR expects a 3-channel image; _preprocess returns greyscale
+            if img.ndim == 2:
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            result = self.reader.predict(img)[0]
+            found = zip(
+                [p.tolist() for p in result["rec_polys"]], result["rec_texts"], result["rec_scores"]
+            )
+        else:
+            found = self.reader.readtext(img, **self.readtext_options)
+
+        for box, text, conf in found:
             text = text.strip()
             if conf < self.min_conf or not text:
                 continue
@@ -320,6 +395,9 @@ def _normalise(text: str) -> str:
         text = text.replace(glyph, ascii_form)
 
     text = _DASH.sub("-", text)
+    text = _MULTI_DASH.sub("-", text)
+    text = _PUNCT_BEFORE_DASH.sub("", text)
+    text = _TO_RANGE.sub(lambda m: (m.group(1) or "") + "-", text)
     text = " ".join(w.strip(_EDGE_JUNK) for w in text.split())
     text = _STUCK_NUMBER.sub(r"\1 \2", text)
     text = " ".join("-".join(_correct_word(part) for part in w.split("-")) for w in text.split())
@@ -331,7 +409,57 @@ def _normalise(text: str) -> str:
     text = _JOINED_BEFORE.sub(r"\1:\2", text)
     text = _JOINED_AFTER.sub(r"\1:\2", text)
     text = _TIME_PAIR.sub(r"\1-\2", text)
+    text = _MISSING_START_MERIDIEM.sub(_fill_start_meridiem, text)
     return " ".join(text.split())
+
+
+def _fill_start_meridiem(m: re.Match) -> str:
+    """
+    Adds the AM/PM to a range's start when only one choice is plausible on a parking sign.
+
+    A choice is implausible if the range would last longer than MAX_RANGE_HOURS
+    ("7:30-7:30PM" as 7:30PM-7:30PM is 24 hours). If both are plausible, a range within one
+    day beats one running overnight ("11-12PM" is 11AM-12PM, not 11PM to noon the next day).
+    Otherwise it's left alone: "7-12AM" could be 7AM or 7PM to midnight.
+    """
+    start_h, start_m, end_h, end_m, end_meridiem = m.groups()
+
+    def minute_of_day(hour: str, mins: str | None, meridiem: str) -> int:
+        return (int(hour) % 12 + (12 if meridiem == "PM" else 0)) * 60 + int(mins or 0)
+
+    end = minute_of_day(end_h, end_m, end_meridiem) or 24 * 60  # ending at 12AM means midnight
+    plausible = []
+    for meridiem in ("AM", "PM"):
+        start = minute_of_day(start_h, start_m, meridiem)
+        overnight = end <= start
+        length = end - start + (24 * 60 if overnight else 0)
+        if length <= MAX_RANGE_HOURS * 60:
+            plausible.append((meridiem, overnight))
+
+    if len(plausible) == 2:
+        plausible = [p for p in plausible if not p[1]]
+    if len(plausible) != 1:
+        return m.group(0)
+    return m.group(0).replace("-", f"{plausible[0][0]}-", 1)
+
+
+def find_unclear_times(lines: list[str]) -> list[str]:
+    """
+    Returns times in the normalised lines that couldn't be read cleanly: ranges missing an
+    AM/PM ("8-10"), garbled ranges ("83M-6PM"), a time with no other end ("8AM"), or an
+    AM/PM with no number ("AM").
+
+    Used to flag a reading for a manual check rather than trusting a guess. Dates and
+    durations ("SAT 26 SEP", "15 MINUTES") aren't time attempts, so they're never flagged.
+    """
+    unclear = []
+    for line in lines:
+        for word in _VALID_RANGE.sub(" ", line).split():  # finished ranges are fine
+            has_digit = any(c.isdigit() for c in word)
+            # An AM/PM on its own means its numbers weren't read ("AM PM" on IMG_1529_panel1)
+            if (has_digit and "-" in word) or _LONE_TIME.fullmatch(word) or word in ("AM", "PM"):
+                unclear.append(word)
+    return unclear
 
 
 def _correct_word(word: str) -> str:

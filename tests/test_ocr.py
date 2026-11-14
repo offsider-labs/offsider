@@ -3,7 +3,18 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.ocr import _attach_meridiems, _group_lines, _normalise, _preprocess, easyocr
+from src.ocr import (
+    DEFAULT_ENGINE,
+    _attach_meridiems,
+    _group_lines,
+    _normalise,
+    _preprocess,
+    easyocr,
+    find_unclear_times,
+    paddleocr,
+)
+
+ENGINE_INSTALLED = (paddleocr if DEFAULT_ENGINE == "paddle" else easyocr) is not None
 
 
 def piece(text, x1, y1, x2, y2, conf=0.9):
@@ -170,10 +181,78 @@ def test_attach_meridiems_ignores_am_pm_as_tall_as_the_number():
     ("9 30AM-6PM", "9:30AM-6PM"),      # hour and minutes read as separate pieces
     ("9 30 AM - 6 PM", "9:30AM-6PM"),
     ("8AM-12 30PM", "8AM-12:30PM"),
-    ("9 30-6PM", "9:30-6PM"),
+    ("9 30-6PM", "9:30AM-6PM"),        # minutes joined, then AM inferred
 ])
 def test_normalise_rebuilds_times(raw, expected):
     assert _normalise(raw) == expected
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("7:30-7:30PM", "7:30AM-7:30PM"),    # IMG_1528_panel1: EasyOCR missed the AM
+    ("730 - 730PM", "7:30AM-7:30PM"),
+    ("11-12PM", "11AM-12PM"),            # 11PM to noon would run overnight
+    ("10-6AM", "10PM-6AM"),              # 10AM-6AM would be 20 hours
+    ("8:30-3PM", "8:30AM-3PM"),          # 8:30PM-3PM would be 18.5 hours
+    ("12:30-10PM", "12:30PM-10PM"),      # IMG_1156/1157 with PaddleOCR: 12:30AM-10PM is 21.5 hours
+    ("1230-10PM", "12:30PM-10PM"),
+])
+def test_normalise_fills_missing_start_meridiem(raw, expected):
+    assert _normalise(raw) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "6-10PM",       # 6AM-10PM and 6PM-10PM are both real signs
+    "12-3PM",       # 12AM-3PM (15h) and 12PM-3PM are both possible
+    "1-6PM",
+    "7-12AM",       # 7AM-midnight and 7PM-midnight are both real (IMG_1170_panel4 has both)
+    "123-10PM",     # not a valid time, left for the reader to flag
+])
+def test_normalise_leaves_ambiguous_start_meridiem(text):
+    assert _normalise(text) == text
+
+
+# PaddleOCR time clean-up (real PaddleOCR output from the crop sets)
+
+@pytest.mark.parametrize("raw, expected", [
+    ("6AM--10AM", "6AM-10AM"),               # IMG_1180_panel1
+    ("1AM TO 12 MIDDAY", "1AM-12 MIDDAY"),
+    ("5AM TO 10:30PM", "5AM-10:30PM"),
+    ("8.-10", "8-10"),
+    ("6..-3", "6-3"),
+])
+def test_normalise_cleans_paddle_times(raw, expected):
+    assert _normalise(raw) == expected
+
+
+@pytest.mark.parametrize("text", ["NO TO 12", "TOW AWAY", "AREA 6 TO"])
+def test_normalise_keeps_to_outside_time_ranges(text):
+    # Only "TO" with a number on both sides is a range
+    assert _normalise(text) == text
+
+
+# find_unclear_times
+
+@pytest.mark.parametrize("lines, expected", [
+    (["2P", "8-10"], ["8-10"]),                          # AM/PM not read
+    (["LOADING", "ZONE AM-12", "MON-SAT"], ["AM-12"]),   # hour not read
+    (["1P", "TICKET", "8AM"], ["8AM"]),                  # other end not read
+    (["83M-6PM", "MON-FRI"], ["83M-6PM"]),               # garbled
+    (["123-10PM"], ["123-10PM"]),
+    (["15 MINUTES", "AM PM", "MON-FRI"], ["AM", "PM"]),   # IMG_1529_panel1: numbers not read
+])
+def test_find_unclear_times_flags_bad_times(lines, expected):
+    assert find_unclear_times(lines) == expected
+
+
+@pytest.mark.parametrize("lines", [
+    ["LOADING", "ZONE", "8:30AM-6PM", "MON-FRI", "8:30AM-12:30PM", "SAT"],
+    ["P10", "MINUTES", "6PM-MIDNIGHT", "MON-SAT"],
+    ["LOADING ZONE", "7AM-12 MIDDAY", "MON-SAT"],
+    ["CLEARWAY", "SPECIAL EVENTS", "SAT 26 SEP"],         # dates aren't times
+    ["15 MINUTES", "MON-FRI", "4P 1/4P"],                 # durations and day ranges aren't either
+])
+def test_find_unclear_times_accepts_clean_readings(lines):
+    assert find_unclear_times(lines) == []
 
 
 @pytest.mark.parametrize("text", [
@@ -204,12 +283,12 @@ def test_preprocess_keeps_large_crop_size():
     assert img.shape == (700, 200)
 
 
-# End-to-end on real crops (needs easyocr and fixtures/sample_crops/)
+# End-to-end on real crops (needs the default OCR engine and fixtures/sample_crops/)
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "sample_crops"
 
 
-@pytest.mark.skipif(easyocr is None, reason="easyocr not installed")
+@pytest.mark.skipif(not ENGINE_INSTALLED, reason=f"{DEFAULT_ENGINE} OCR engine not installed")
 @pytest.mark.skipif(not any(FIXTURES.glob("*.[jp][pn]g")), reason="no fixture crops")
 def test_read_signs_on_fixtures():
     from src.detector import SignDetector

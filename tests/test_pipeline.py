@@ -88,7 +88,7 @@ def test_annotated_frame_is_a_copy(monkeypatch):
     assert not FRAME.any()  # input frame isn't drawn on
 
 
-# End-to-end on real photos (needs YOLO weights, easyocr and the Roboflow v3 download)
+# End-to-end on real photos (needs YOLO weights, the OCR engine and the Roboflow v3 download)
 
 ROOT = Path(__file__).parent.parent
 PHOTOS = sorted((ROOT / "data" / "sign-detection-full").glob("valid/images/*.jpg"))[:2]

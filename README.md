@@ -10,6 +10,8 @@ Offsider pairs object detection with optical character recognition (OCR) to fram
 
 ---
 
+Landing Page: https://offsider-labs.github.io/offsider/
+
 ## Architecture
 
 ```mermaid

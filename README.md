@@ -10,13 +10,55 @@ Offsider pairs object detection with optical character recognition (OCR) to fram
 
 ---
 
-## Architecture Pipeline
+## Architecture
 
-<p align="center">
-  <img src="docs/assets/flow-diagram.png" alt="Offsider Architecture Flow" width="700">
-  <br>
-  <em>Figure 1: High-level system flow diagram (work-in-progress prototype).</em>
-</p>
+```mermaid
+graph TD
+    subgraph In-Vehicle Edge System
+        A["Live Dashcam Video Stream"] --> B["Vehicle State Monitor<br>(Handbrake / Shift to Park)"]
+        B -->|Trigger Event| C["Frame Capture Buffer"]
+        C --> D["YOLOv8n Object Detector<br>(Sign Localization)"]
+        D --> E["EasyOCR Engine<br>(Text Extraction)"]
+        E --> F["Deterministic Rule Parser<br>(Time, Day & Limit Match)"]
+        F --> G["Driver Dashboard UI Feedback"]
+    end
+
+    style A fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1
+    style B fill:#FFF9C4,stroke:#FBC02D,stroke-width:2px,color:#F57F17
+    style C fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+    style D fill:#EDE7F6,stroke:#512DA8,stroke-width:2px,color:#311B92
+    style E fill:#EDE7F6,stroke:#512DA8,stroke-width:2px,color:#311B92
+    style F fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+    style G fill:#E1F5FE,stroke:#0288D1,stroke-width:2px,color:#01579B
+```
+
+
+## Demo User Flow
+```mermaid
+graph TD
+    Start([System Idle / Monitoring]) --> Trigger[Simulated Event Trigger:\nSelect Scenario & Engage Handbrake]
+    Trigger --> RunPipeline[Execute YOLOv8n + EasyOCR Pipeline]
+    RunPipeline --> Check1{Is there a frame with a clear parking sign?}
+    Check1 -->|No| Manual[Display 'CHECK MANUALLY' on Dashboard]
+    Check1 -->|Yes| Parse[Evaluate via Deterministic Rule Engine]
+    Parse --> Check2{Is Parking Allowed?}
+    Check2 -->|Yes| Clear[Display 'CLEAR / LEGAL' on Dashboard]
+    Check2 -->|No| Restrict[Display 'RESTRICTED / FINE RISK' on Dashboard]
+    Clear --> End([Standby for Next Event])
+    Restrict --> End
+    Manual --> End
+
+    style Start fill:#ECEFF1,stroke:#455A64,stroke-width:2px,color:#263238
+    style Trigger fill:#FFF9C4,stroke:#FBC02D,stroke-width:2px,color:#F57F17
+    style RunPipeline fill:#EDE7F6,stroke:#512DA8,stroke-width:2px,color:#311B92
+    style Parse fill:#E1F5FE,stroke:#0288D1,stroke-width:2px,color:#01579B
+    style Check2 fill:#FFF3E0,stroke:#EF6C00,stroke-width:2px,color:#E65100
+    style Clear fill:#C8E6C9,stroke:#388E3C,stroke-width:2px,color:#1B5E20
+    style Restrict fill:#FFCDD2,stroke:#D32F2F,stroke-width:2px,color:#B71C1C
+    style Manual fill:#ffe354,stroke:#aa9f67,stroke-width:2px,color:#988a42
+    style End fill:#ECEFF1,stroke:#455A64,stroke-width:2px,color:#263238
+```
+
 
 ---
 
@@ -49,7 +91,7 @@ offsider/
 # Getting Started
 
 ### Prerequisites
-  - Python 3.12 or higher
+  - Python 3.12 (recommended) or 3.13
   - Git
 
 ### Installation
@@ -78,7 +120,19 @@ mv ~/Downloads/best.pt models/best.pt
 
 ### Running the Interactive UI
 
-`streamlit run steamlit_app/app.py`
+`streamlit run streamlit_app/app.py`
+
+### Deploying to Streamlit Community Cloud
+
+Use `main` as the branch and `streamlit_app/app.py` as the entry point.
+Before deploying, open **Advanced settings** and select **Python 3.12**.
+PaddlePaddle requires Python below 3.14 for the versions used here.
+The repository's `.python-version` configures local tooling; Cloud's Python
+version must be selected in the deployment settings.
+
+If an existing deployment uses Python 3.14, save its secrets and settings,
+then delete and redeploy the app with Python 3.12. Rebooting the app or pushing
+dependency changes does not change its Python runtime.
 
 ## Contributors & Team
 

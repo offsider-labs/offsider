@@ -1,5 +1,7 @@
 # Used by Streamlit Community Cloud, which reads this file instead of pyproject.toml.
 # Keep in sync with what src/ and streamlit_app/ import.
+# Deploy with Python 3.12 in Streamlit Cloud's Advanced settings. PaddlePaddle
+# does not provide Python 3.14 wheels; .python-version does not set Cloud's runtime.
 
 # CPU-only PyTorch: the default Linux wheels bundle CUDA (several GB) and break the deploy
 --extra-index-url https://download.pytorch.org/whl/cpu
@@ -11,4 +13,9 @@ opencv-python-headless
 numpy
 pydantic>=2.14.1
 ultralytics>=8.4.175
+
+# OCR: PaddleOCR is the default engine (src/ocr.py). Its models download on first start.
+# EasyOCR is kept as the fallback (OFFSIDER_OCR_ENGINE=easyocr).
+paddleocr>=3.7,<4
+paddlepaddle>=3.3,<4
 easyocr>=1.7.2

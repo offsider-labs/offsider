@@ -451,33 +451,16 @@ elif preset_files:
 if not active_video_path or not Path(active_video_path).exists():
     st.info("No video clip found in `data/demo_clips/`.")
 else:
-    cap_meta = cv2.VideoCapture(active_video_path)
-    v_fps = cap_meta.get(cv2.CAP_PROP_FPS) or 30.0
-    v_frames = int(cap_meta.get(cv2.CAP_PROP_FRAME_COUNT))
-    v_duration = max(1.0, round(v_frames / v_fps, 1))
-    cap_meta.release()
+    # Big hero video display (stops at 5s)
+    st.video(active_video_path, autoplay=True, muted=True, end_time=5, loop=False)
 
-    # Big hero video display
-    st.video(active_video_path, autoplay=True, muted=True, loop=True)
-
-    # Scrubber slider and primary action button directly beneath video
-    col_scrub, col_btn = st.columns([3.4, 1.2], vertical_alignment="center")
-    with col_scrub:
-        park_ts = st.slider(
-            "Timestamp",
-            min_value=0.5,
-            max_value=float(v_duration),
-            value=float(v_duration),
-            step=0.2,
-            format="%.1fs",
-            label_visibility="collapsed",
-        )
-    with col_btn:
-        trigger_scan = st.button(
-            "PARK",
-            type="primary",
-            use_container_width=True,
-        )
+    # Primary action button directly beneath video (timestamp hardcoded to 5s)
+    park_ts = 4.0
+    trigger_scan = st.button(
+        "PARK",
+        type="primary",
+        use_container_width=True,
+    )
 
     if trigger_scan:
         st.session_state.scan_output = scan_lookback_buffer(

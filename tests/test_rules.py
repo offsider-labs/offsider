@@ -169,3 +169,63 @@ def test_parse_text_to_rules_supports_nsw_signs():
     assert len(rules_2p) == 1
     assert rules_2p[0].restriction_type == RestrictionType.METER_PARKING
     assert rules_2p[0].max_duration_minutes == 120
+
+def test_parse_compact_ocr_time_range():
+    rules = parse_text_to_rules("2P\n8AM10PM\nMON-FRI")
+
+    assert len(rules) == 1
+    assert rules[0].start_time == time(8)
+    assert rules[0].end_time == time(22)
+    for hour, expected_active in [(7, False), (12, True), (23, False)]:
+        verdict = evaluate_parking_permission(rules, VehicleClass.SEDAN, time(hour), "MON")
+        assert verdict.restriction_active == expected_active
+
+
+def test_bus_zone_without_posted_schedule_applies_on_sunday():
+    rules = parse_text_to_rules("BUS\nZONE")
+
+    assert rules[0].restriction_type == RestrictionType.BUS_ZONE
+    verdict = evaluate_parking_permission(rules, VehicleClass.SEDAN, time(23, 59, 59), "SUN")
+    assert not verdict.allowed
+    assert verdict.restriction_active
+    assert verdict.max_stay_minutes == 0
+
+
+def test_bus_zone_honours_posted_hours_and_days():
+    rules = parse_text_to_rules("BUS ZONE\n8AM-6PM\nMON-FRI")
+
+    for day, hour, allowed in [("MON", 12, False), ("MON", 7, True), ("SUN", 12, True)]:
+        verdict = evaluate_parking_permission(rules, VehicleClass.SEDAN, time(hour), day)
+        assert verdict.allowed == allowed
+
+
+@pytest.mark.parametrize(
+    "text, allowed, active, max_stay",
+    [
+        ("NO STOPPING", False, True, 0),
+        ("CLEARWAY\nAT ALL TIMES", False, True, 0),
+        ("2P\n8AM10PM", True, True, 120),
+        ("2P\n8AM10PM\nMON-FRI", True, False, None),
+    ],
+)
+def test_sunday_verdict_uses_posted_days(text, allowed, active, max_stay):
+    rules = parse_text_to_rules(text)
+    verdict = evaluate_parking_permission(rules, VehicleClass.SEDAN, time(12), "SUN")
+
+    assert verdict.allowed == allowed
+    assert verdict.restriction_active == active
+    assert verdict.max_stay_minutes == max_stay
+
+
+def test_abbreviated_friday_end_of_day_range():
+    rules = parse_text_to_rules("2P\n8AM-6PM\nMON-FR")
+
+    assert rules[0].days == ["MON", "TUE", "WED", "THU", "FRI"]
+    verdict = evaluate_parking_permission(rules, VehicleClass.SEDAN, time(12), "TUE")
+    assert verdict.restriction_active
+    assert verdict.max_stay_minutes == 120
+
+
+@pytest.mark.parametrize("days", ["MON-F?", "MON-", "?-FRI"])
+def test_unreadable_day_range_does_not_produce_a_rule(days):
+    assert parse_text_to_rules(f"2P\n8AM-6PM\n{days}") == []

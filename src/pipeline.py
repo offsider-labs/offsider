@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 
 from src.detector import SignDetector
-from src.ocr import SignReader
+from src.ocr import SignReader, find_unclear_times
 from src.rules import evaluate_parking_permission, parse_text_to_rules
 from src.schemas import ClearanceVerdict, ParkingRule, VehicleClass
 
@@ -23,6 +23,12 @@ MIN_OCR_CONF = 0.4
 GREEN = (0, 200, 0)
 RED = (0, 0, 220)
 AMBER = (0, 165, 255)
+
+STREET_NAME_SUFFIXES = {"STREET", "STREE", "ROAD", "AVENUE", "LANE"}
+PARKING_PANEL_WORDS = {
+    "BUS", "CLEARWAY", "EXCEPTED", "HOLDERS", "LOADING", "METER", "MINUTES",
+    "NO", "ONLY", "PARKING", "PERMIT", "STOPPING", "TAXI", "TICKET", "ZONE",
+}
 
 # Resolved from this file rather than the working directory, so the weights are found
 # however the app is launched (locally or on Streamlit Cloud)
@@ -49,6 +55,32 @@ def get_reader(gpu: bool = False) -> SignReader:
     if _reader is None:
         _reader = SignReader(gpu=gpu)
     return _reader
+
+
+def _hours_warning(rules: List[ParkingRule]) -> ClearanceVerdict:
+    return ClearanceVerdict(
+        allowed=False,
+        restriction_active=False,
+        reason="Couldn't read the operating hours.",
+        warning="Check the posted hours on the sign.",
+        rules=rules,
+    )
+
+
+def _is_street_name_panel(meta: dict, reading: dict) -> bool:
+    """Recognize a wide panel with a confidently read street name."""
+    left, top, right, bottom = meta["bbox"]
+    height = bottom - top
+    if height <= 0 or right - left < 2.5 * height or reading["mean_conf"] < 0.8:
+        return False
+
+    words = " ".join(reading["lines"]).upper().split()
+    return (
+        2 <= len(words) <= 5
+        and words[-1] in STREET_NAME_SUFFIXES
+        and all(word.isalpha() for word in words)
+        and not PARKING_PANEL_WORDS.intersection(words)
+    )
 
 
 def add_frame_border(img_bgr: np.ndarray, status: str, boxes: Optional[list] = None) -> np.ndarray:
@@ -109,12 +141,20 @@ def process_frame(
     # each panel is parsed on its own, so its times and days stay with its own restriction
     rules: List[ParkingRule] = []
     unread_panels = 0
+    parking_panels = 0
+    unclear_hours = False
     for (crop_panel, meta), result in zip(detections, ocr_results):
         text = "\n".join(result["lines"])  # parser expects one line per sign line
         panel_rules = parse_text_to_rules(text)
-        rules.extend(panel_rules)
+        if not panel_rules and _is_street_name_panel(meta, result):
+            continue
+        parking_panels += 1
+        panel_hours_unclear = bool(panel_rules and find_unclear_times(result["lines"]))
+        unclear_hours |= panel_hours_unclear
+        if not panel_hours_unclear:
+            rules.extend(panel_rules)
 
-        readable = bool(panel_rules) and result["mean_conf"] >= MIN_OCR_CONF
+        readable = bool(panel_rules) and not panel_hours_unclear and result["mean_conf"] >= MIN_OCR_CONF
         if not readable:
             unread_panels += 1
 
@@ -142,7 +182,7 @@ def process_frame(
     verdict.rules = rules
 
     # never say "allowed" when part of the sign wasn't understood
-    if verdict.allowed and not detections:
+    if verdict.allowed and not parking_panels:
         verdict = ClearanceVerdict(
             allowed=False,
             restriction_active=False,
@@ -150,11 +190,13 @@ def process_frame(
             warning="No sign found. Point the camera at the sign.",
             rules=[],
         )
+    elif verdict.allowed and unclear_hours:
+        verdict = _hours_warning(rules)
     elif verdict.allowed and unread_panels:
         verdict = ClearanceVerdict(
             allowed=False,
             restriction_active=False,
-            reason=f"Couldn't read {unread_panels} of {len(detections)} sign panels.",
+            reason=f"Couldn't read {unread_panels} of {parking_panels} sign panels.",
             warning="Part of the sign couldn't be read. Check the sign yourself.",
             rules=rules,
         )
@@ -266,20 +308,24 @@ def scan_lookback_buffer(
         verified_crops = []
         verified_results = []
         frame_rules: List[ParkingRule] = []
+        unclear_hours = False
 
         for crop_tuple, res in zip(crops, results):
             lines = res.get("lines", [])
             text = "\n".join(lines)
             p_rules = parse_text_to_rules(text)
-            frame_rules.extend(p_rules)
+            panel_hours_unclear = bool(p_rules and find_unclear_times(lines))
+            unclear_hours |= panel_hours_unclear
+            if not panel_hours_unclear:
+                frame_rules.extend(p_rules)
 
             # OCR gate checks rule readability and mean confidence threshold
-            is_valid = bool(p_rules) and (res.get("mean_conf", 0.0) >= min_ocr_conf)
+            is_valid = bool(p_rules) and not panel_hours_unclear and res.get("mean_conf", 0.0) >= min_ocr_conf
             if is_valid or not ocr_gate:
                 verified_crops.append(crop_tuple)
                 verified_results.append(res)
 
-        if ocr_gate and not verified_crops:
+        if ocr_gate and not verified_crops and not unclear_hours:
             max_det = max((m.get("confidence", 0.0) for _, m in crops), default=0.0)
             thumb = add_frame_border(frame_bgr, "REJECTED", boxes)
             trace.append({
@@ -291,8 +337,9 @@ def scan_lookback_buffer(
             })
             continue
 
-        active_crops = verified_crops if ocr_gate else crops
-        active_results = verified_results if ocr_gate else results
+        show_all_panels = not ocr_gate or unclear_hours
+        active_crops = crops if show_all_panels else verified_crops
+        active_results = results if show_all_panels else verified_results
 
         # Evaluate parking permission using repo function
         verdict = evaluate_parking_permission(
@@ -302,6 +349,8 @@ def scan_lookback_buffer(
             arrival_day=eval_day,
         )
         verdict.rules = frame_rules
+        if verdict.allowed and unclear_hours:
+            verdict = _hours_warning(frame_rules)
         final_verdict = verdict
 
         max_det = max((m.get("confidence", 0.0) for _, m in active_crops), default=0.0)

@@ -6,6 +6,8 @@ import re
 import cv2
 import numpy as np
 
+from src.rules import parse_time_str
+
 try:
     import easyocr
 except ImportError:
@@ -134,7 +136,9 @@ _PUNCT_BEFORE_DASH = re.compile(r"(?<=\d)[.,;]+(?=-)")
 # --- Times that couldn't be read cleanly ---
 # A finished range: both ends have AM/PM (or are MIDNIGHT / 12 MIDDAY)
 _VALID_END = r"(?:\d{1,2}(?::\d{2})?(?:AM|PM)|MIDNIGHT|12 MIDDAY)"
-_VALID_RANGE = re.compile(rf"\b\d{{1,2}}(?::\d{{2}})?(?:AM|PM)-{_VALID_END}(?![\w:])")
+_VALID_RANGE = re.compile(rf"\b\d{{1,2}}(?::\d{{2}})?(?:AM|PM)-?{_VALID_END}(?![\w:])")
+_EXPLICIT_RANGE = re.compile(r"(\d{1,2}(?::\d{2})?\s*(?:AM|PM))\s*[-–]?\s*"
+                             r"(\d{1,2}(?::\d{2})?\s*(?:AM|PM))")
 # A single time with AM/PM, which on a sign should always be one end of a range
 _LONE_TIME = re.compile(r"\d{1,2}(?::\d{2})?(?:AM|PM)")
 
@@ -194,6 +198,11 @@ class SignReader:
             img, offset = _add_border(img)
             pieces = self._run_ocr(img, scale, offset)
             lines = [_normalise(line) for line in _group_lines(_attach_meridiems(pieces))]
+            for index, line in enumerate(lines):
+                if find_unclear_times([line]):
+                    recovered = self._retry_time_line(crop, pieces, line)
+                    if recovered:
+                        lines[index] = recovered
             confs = [p["conf"] for p in pieces]
 
             results.append({
@@ -205,6 +214,41 @@ class SignReader:
             })
 
         return results
+
+    def _retry_time_line(self, crop: np.ndarray, pieces: list[dict], line: str) -> str | None:
+        """Re-read a padded band around OCR pieces that supplied an ambiguous time."""
+        words = line.split()
+        tokens = set(find_unclear_times([line])).intersection(words)
+        boxes = [_bounds(piece) for piece in pieces
+                 if tokens.intersection(_normalise(piece["text"]).split())]
+        if not boxes:
+            return None
+
+        left, top, right, bottom = zip(*boxes)
+        padding = max(2, (max(bottom) - min(top)) // 3)
+        band = crop[max(0, min(top) - padding):max(bottom) + padding,
+                    max(0, min(left) - 2 * padding):max(right) + 2 * padding]
+        if not band.size:
+            return None
+
+        img, scale = _preprocess(band)
+        img, offset = _add_border(img)
+        retry = self._run_ocr(img, scale, offset)
+        if not retry or float(np.mean([piece["conf"] for piece in retry])) < 0.4:
+            return None
+        retry_text = " ".join(_group_lines(_attach_meridiems(retry))).upper()
+        match = _EXPLICIT_RANGE.fullmatch(retry_text)
+        if match:
+            try:
+                for endpoint in match.groups():
+                    parse_time_str(endpoint)
+            except ValueError:
+                return None
+            recovered = "-".join(endpoint.replace(" ", "") for endpoint in match.groups())
+            index = next(i for i, word in enumerate(words) if word in tokens)
+            tail = [word for word in words[index:] if word not in tokens]
+            return " ".join([*words[:index], recovered, *tail])
+        return None
 
     def _run_ocr(self, img: np.ndarray, scale: float, offset: int = 0) -> list[dict]:
         """

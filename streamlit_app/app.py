@@ -538,6 +538,18 @@ else:
                 dwell_str = "0 MIN"
             elif verdict.max_stay_minutes < 60:
                 dwell_str = f"{verdict.max_stay_minutes} MIN"
+            if verdict.warning:
+                dwell_str = "CHECK SIGN"
+            elif verdict.max_stay_minutes is not None:
+                if verdict.max_stay_minutes == 0:
+                    dwell_str = "0 MIN (IMMEDIATE INFRINGEMENT)"
+                elif verdict.max_stay_minutes < 60:
+                    dwell_str = f"{verdict.max_stay_minutes} MIN MAX"
+                else:
+                    hrs = verdict.max_stay_minutes // 60
+                    dwell_str = f"{hrs} HOUR{'S' if hrs > 1 else ''} MAX"
+            elif not verdict.allowed:
+                dwell_str = "0 MIN (PROHIBITED)"
             else:
                 dwell_str = f"{verdict.max_stay_minutes // 60}H"
         elif not verdict.allowed:

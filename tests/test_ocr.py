@@ -5,6 +5,7 @@ import pytest
 
 from src.ocr import (
     DEFAULT_ENGINE,
+    SignReader,
     _attach_meridiems,
     _group_lines,
     _normalise,
@@ -20,6 +21,21 @@ ENGINE_INSTALLED = (paddleocr if DEFAULT_ENGINE == "paddle" else easyocr) is not
 def piece(text, x1, y1, x2, y2, conf=0.9):
     """Builds a fake EasyOCR piece with a rectangular box."""
     return {"text": text, "conf": conf, "box": [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]}
+
+
+def test_retry_recovers_explicit_hours(monkeypatch):
+    reader = SignReader.__new__(SignReader)
+    readings = iter([
+        [piece("2P", 20, 10, 45, 25), piece("8-6", 20, 40, 50, 50)],
+        [piece("8 AM - 6 PM", 0, 0, 50, 10)],
+    ])
+    monkeypatch.setattr(reader, "_run_ocr", lambda *args: next(readings))
+    crop = np.zeros((100, 80, 3), dtype=np.uint8)
+
+    result, = reader.read([(crop, {})])
+
+    assert result["lines"] == ["2P", "8AM-6PM"]
+    assert result["unclear_times"] == []
 
 
 # _group_lines

@@ -10,6 +10,7 @@ from src.schemas import (
 )
 
 DAY_MAP = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+DAY_RANGE = re.compile(r"(?<!\w)([A-Z0-9?]*)\s*[-–—]\s*([A-Z0-9?]*)(?!\w)")
 
 
 def parse_time_str(time_str: str) -> time:
@@ -23,6 +24,9 @@ def parse_time_str(time_str: str) -> time:
     minute = int(match.group(2)) if match.group(2) else 0
     meridiem = match.group(3)
 
+    if not 1 <= hour <= 12:
+        raise ValueError(f"Hour out of range: {time_str}")
+
     if meridiem == "PM" and hour != 12:
         hour += 12
     elif meridiem == "AM" and hour == 12:
@@ -31,12 +35,15 @@ def parse_time_str(time_str: str) -> time:
     return time(hour, minute)
 
 
-def parse_days(day_str: str) -> List[str]:
-    """Parses 'MON-FRI' into ['MON', 'TUE', 'WED', 'THU', 'FRI'] or single days."""
+def parse_days(day_str: str) -> Optional[List[str]]:
+    """Return posted days, every day if omitted, or None for an unreadable range."""
     clean = day_str.strip().upper()
-    range_match = re.search(r"\b(MON|TUE|WED|THU|FRI|SAT|SUN)\s*-\s*(MON|TUE|WED|THU|FRI|SAT|SUN)\b", clean)
-    if range_match:
-        start_day, end_day = range_match.group(1), range_match.group(2)
+    for range_match in DAY_RANGE.finditer(clean):
+        start_day, end_day = ("FRI" if day == "FR" else day for day in range_match.groups())
+        if start_day not in DAY_MAP and end_day not in DAY_MAP:
+            continue
+        if start_day not in DAY_MAP or end_day not in DAY_MAP:
+            return None
         start_idx = DAY_MAP.index(start_day)
         end_idx = DAY_MAP.index(end_day)
         if start_idx <= end_idx:
@@ -44,7 +51,7 @@ def parse_days(day_str: str) -> List[str]:
         return DAY_MAP[start_idx:] + DAY_MAP[: end_idx + 1]
 
     found = [d for d in DAY_MAP if re.search(rf"\b{d}\b", clean)]
-    return found if found else ["MON", "TUE", "WED", "THU", "FRI"]
+    return found or DAY_MAP.copy()
 
 
 def parse_text_to_rules(raw_text: str) -> List[ParkingRule]:
@@ -75,6 +82,8 @@ def parse_text_to_rules(raw_text: str) -> List[ParkingRule]:
     elif "NO PARKING" in text:
         res_type = RestrictionType.NO_PARKING
         duration_mins = 2  # NSW Rule 168: 2-minute max drop-off
+    elif re.search(r"\bBUS\s+ZONE\b", text):
+        res_type = RestrictionType.BUS_ZONE
     else:
         # check for duration limits: 1/4P, 1/2P, 1P, 2P, 3P, 4P, etc.
         p_match = re.search(r"\b(1/4|1/2|1|2|3|4|5|6|7|8)\s*P\b", text)
@@ -104,9 +113,10 @@ def parse_text_to_rules(raw_text: str) -> List[ParkingRule]:
     if not res_type:
         return rules
 
-    # extract operating hours: e.g., '7:30AM - 6PM' or '7AM - 9AM'
+    # OCR can omit the separator between two times with explicit AM/PM markers.
     time_match = re.search(
-        r"(\d{1,2}(?::\d{2})?\s*(?:AM|PM))\s*-\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM))",
+        r"\b(\d{1,2}(?::\d{2})?\s*(?:AM|PM))\s*[-–]?\s*"
+        r"(\d{1,2}(?::\d{2})?\s*(?:AM|PM))\b",
         text
     )
 
@@ -118,10 +128,12 @@ def parse_text_to_rules(raw_text: str) -> List[ParkingRule]:
             start_t, end_t = time(0, 0), time(23, 59)
     else:
         # default full day if no window is listed
-        start_t, end_t = time(0, 0), time(23, 59)
+        start_t, end_t = time.min, time.max
 
     # extract active days
     days = parse_days(text)
+    if days is None:
+        return rules
 
     rules.append(
         ParkingRule(
@@ -171,11 +183,12 @@ def evaluate_parking_permission(
                         max_stay_minutes=0,
                         rules=rules,
                     )
-                elif rule.restriction_type == RestrictionType.NO_STOPPING:
+                elif rule.restriction_type in (RestrictionType.NO_STOPPING, RestrictionType.BUS_ZONE):
+                    restriction = "Bus Zone" if rule.restriction_type == RestrictionType.BUS_ZONE else "No Stopping"
                     return ClearanceVerdict(
                         allowed=False,
                         restriction_active=True,
-                        reason="No Stopping active; stopping prohibited.",
+                        reason=f"{restriction} active; stopping prohibited.",
                         max_stay_minutes=0,
                         rules=rules,
                     )

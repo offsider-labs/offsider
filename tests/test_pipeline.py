@@ -7,8 +7,9 @@ import cv2
 import numpy as np
 import pytest
 
+from eval.score_pipeline import load_scenarios, score_scenario
 from src import pipeline
-from src.schemas import ClearanceVerdict, VehicleClass
+from src.schemas import VehicleClass
 
 FRAME = np.zeros((400, 300, 3), dtype=np.uint8)
 
@@ -44,6 +45,67 @@ def test_no_sign_detected_says_check_sign(monkeypatch):
     verdict, _ = run(monkeypatch, [])
     assert verdict.allowed is False
     assert verdict.warning
+
+
+def test_unreadable_hours_do_not_become_all_day_rule(monkeypatch):
+    verdict, _ = run(monkeypatch, [["2P", "8-6", "MON-FRI"]], at=time(7))
+    assert verdict.warning
+    assert verdict.reason == "Couldn't read the operating hours."
+    assert not verdict.restriction_active
+    assert verdict.max_stay_minutes is None
+    assert verdict.rules == []
+
+
+def test_unreadable_day_range_requires_checking_the_sign(monkeypatch):
+    verdict, _ = run(monkeypatch, [["2P", "8AM-6PM", "MON-F?"]])
+
+    assert verdict.warning
+    assert not verdict.allowed
+    assert verdict.rules == []
+
+
+@pytest.mark.parametrize(
+    "extra_panel, expected_allowed, expected_warning",
+    [
+        (["SDOWE", "ORD STREE"], True, False),
+        (["BUS", "ZONE", "ORD STREE"], False, False),
+        ([], False, True),
+    ],
+)
+def test_wide_street_name_panel_does_not_override_parking_rule(
+    monkeypatch, extra_panel, expected_allowed, expected_warning
+):
+    detector = FakeDetector(2)
+    detections = detector.detect_and_crop(FRAME)
+    detections[1][1]["bbox"] = [0, 120, 140, 170]
+    monkeypatch.setattr(pipeline, "get_detector", lambda: detector)
+    monkeypatch.setattr(detector, "detect_and_crop", lambda frame: detections)
+    monkeypatch.setattr(pipeline, "get_reader", lambda: FakeReader([["2P", "8AM10PM"], extra_panel]))
+
+    verdict, _ = pipeline.process_frame(FRAME, VehicleClass.SEDAN, time(12), "MON")
+
+    assert bool(verdict.warning) == expected_warning
+    assert verdict.allowed == expected_allowed
+
+
+def test_lookback_flags_unreadable_hours(monkeypatch, tmp_path):
+    path = tmp_path / "frame.avi"
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), 4, (300, 400))
+    assert writer.isOpened()
+    for _ in range(8):
+        writer.write(FRAME)
+    writer.release()
+
+    detector = FakeDetector(1)
+    detector.model = object()
+    monkeypatch.setattr(pipeline, "get_detector", lambda **kwargs: detector)
+    monkeypatch.setattr(pipeline, "get_reader", lambda: FakeReader([["2P", "8-6"]]))
+
+    result = pipeline.scan_lookback_buffer(str(path), 1.5, arrival_time=time(7), arrival_day="MON")
+
+    assert result["found"]
+    assert result["verdict"].reason == "Couldn't read the operating hours."
+    assert result["verdict"].max_stay_minutes is None
 
 
 def test_unreadable_panel_says_check_sign(monkeypatch):
@@ -88,20 +150,22 @@ def test_annotated_frame_is_a_copy(monkeypatch):
     assert not FRAME.any()  # input frame isn't drawn on
 
 
-# End-to-end on real photos (needs YOLO weights, the OCR engine and the Roboflow v3 download)
+# Known-good end-to-end cases from the benchmark's labelled image set.
+SCENARIOS = {
+    (row["image"], row["day"], row["time"], row["vehicle"]): row
+    for row in load_scenarios()
+}
 
-ROOT = Path(__file__).parent.parent
-PHOTOS = sorted((ROOT / "data" / "sign-detection-full").glob("valid/images/*.jpg"))[:2]
 
-
-@pytest.mark.skipif(not PHOTOS, reason="no photos in data/sign-detection-full")
-@pytest.mark.skipif(not (ROOT / "models" / "best.pt").exists(), reason="no YOLO weights")
-@pytest.mark.parametrize("photo", PHOTOS, ids=lambda p: p.name[:8])
-def test_process_frame_on_real_photo(photo, monkeypatch):
-    monkeypatch.chdir(ROOT)  # weights path in pipeline is relative to the project root
-    frame = cv2.imread(str(photo))
-    verdict, annotated = pipeline.process_frame(
-        frame, VehicleClass.SEDAN, arrival_time=time(12, 0), arrival_day="TUE"
-    )
-    assert isinstance(verdict, ClearanceVerdict)
-    assert annotated.shape == frame.shape
+@pytest.mark.skipif(not Path(pipeline.DEFAULT_WEIGHTS).exists(), reason="no YOLO weights")
+@pytest.mark.parametrize(
+    "image, day, at, vehicle",
+    [
+        ("valid-2.png", "MON", "12:00", "sedan"),
+        ("valid-2.png", "MON", "23:00", "sedan"),
+        ("invalid-13.png", "SUN", "12:00", "sedan"),
+    ],
+)
+def test_process_frame_matches_expected_verdict(image, day, at, vehicle):
+    result = score_scenario(SCENARIOS[image, day, at, vehicle])
+    assert result["exact_match"], result

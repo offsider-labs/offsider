@@ -12,6 +12,7 @@ class VehicleClass(str, Enum):
 
 
 class RestrictionType(str, Enum):
+    BUS_ZONE = "BUS_ZONE"
     LOADING_ZONE = "LOADING_ZONE"
     METER_PARKING = "METER"
     TICKET_PARKING = "TICKET"

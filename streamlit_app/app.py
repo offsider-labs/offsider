@@ -447,7 +447,9 @@ else:
                 v_tag = f"PERMITTED // {selected_vehicle.value.upper()} ELIGIBLE"
                 v_title = "PARKING PERMITTED"
 
-            if verdict.max_stay_minutes is not None:
+            if verdict.warning:
+                dwell_str = "CHECK SIGN"
+            elif verdict.max_stay_minutes is not None:
                 if verdict.max_stay_minutes == 0:
                     dwell_str = "0 MIN (IMMEDIATE INFRINGEMENT)"
                 elif verdict.max_stay_minutes < 60:

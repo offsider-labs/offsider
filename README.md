@@ -136,6 +136,24 @@ If an existing deployment uses Python 3.14, save its secrets and settings,
 then delete and redeploy the app with Python 3.12. Rebooting the app or pushing
 dependency changes does not change its Python runtime.
 
+## Data Practices
+
+Offsider uses two distinct sets of street-sign imagery: a **110-image training dataset** for custom `YOLOv8` sign detection and a **20-image evaluation dataset** (expanded into **37 scenario rows**) for end-to-end compliance scoring.
+
+### 1. YOLO Training Dataset (~110 Images)
+* **Sources:** 110 street-sign images collected from the real world, and Google Maps, covering parking and kerbside restriction signs (such as timed parking, `No Stopping`, `Clearway`, `Bus Zone`, and `Taxi Zone` signs) across varied angles, lighting, and distances.
+* **Preparation & Annotation:** Images were labelled with bounding boxes in YOLO format (`Roboflow`) and prepared using auto-orientation, and resizing to 640x640 (optimal for YOLO model).
+* **Data Quality & Scope:** Signs were annotated for localisation rather than fine-grained spatial arrow geometry or multi-plate pole relationships.
+
+### 2. Evaluation Dataset (20 Images / 37 Scenarios)
+* **Sources:** 20 real street-sign images (`valid-1.png`–`valid-5.png` and `invalid-1.png`–`invalid-15.png`) captured from Google Maps street imagery in NSW, evaluated across **37 scenario combinations** in `eval/expected-verdicts.csv` varying `day` (`MON`, `TUE`, `SAT`, `SUN`), `time` (`07:00`, `12:00`, `23:00`), and `vehicle` class (`sedan`).
+* **Repeatable Prep & Scoring:** Images are stored in `eval/test-images/` and paired with ground-truth verdicts (`expected_status`, `expected_active`, `expected_max_stay_minutes`) and rule rationales (`basis`). Evaluation runs reproducibly via `eval/score_pipeline.py` using the real YOLO detector (`use_mock == False`).
+* **Train / Tuning vs. Evaluation Separation:** The 20 evaluation images are separate from the 110 YOLO training images. [State accurately whether any of the 20 eval images were viewed/used while tuning regex rules or confidence thresholds, or whether they were held back—if any were used for debugging/tuning, note that explicitly rather than claiming a blind split.]
+
+### 3. Licensing, Privacy & Known Data Limitations
+* **Privacy:** Images focus on public street signage; where street scenes include surrounding surroundings, no private identities or sensitive personal records are intentionally collected or exposed.
+* **Known Limitations (Spatial & Stacked Signs):** Complex multi-plate stacked signs and split directional signs (such as opposing left/right restrictions like `No Stopping` vs. `1P` on opposite sides) were excluded or flagged as out-of-scope for v1 because Offsider does not currently model arrow direction or vehicle-relative spatial side. These remain documented limitations for future spatial/arrow parsing work.
+
 ## Contributors & Team
 
 __David Van Kriedt__ - Main Developer

@@ -1,11 +1,11 @@
 image,day,time,vehicle,expected_status,expected_active,expected_max_stay_minutes,basis
 valid-1.png,MON,12:00,sedan,Allowed,true,60,1P meter sign during posted hours
 valid-2.png,MON,12:00,sedan,Allowed,true,120,2P sign during posted hours
-valid-3.png,MON,12:00,sedan,Allowed,true,120,2P sign during posted hours
+valid-3.png,MON,12:00,van,Allowed,true,120,2P sign during posted hours
 valid-4.png,MON,12:00,sedan,Allowed,true,120,2P sign during posted hours
 valid-5.png,MON,12:00,sedan,Allowed,true,120,2P sign during posted hours
 invalid-1.png,MON,12:00,sedan,Restricted,true,0,No Stopping
-invalid-2.png,MON,12:00,sedan,Restricted,true,0,No Stopping
+invalid-2.png,MON,12:00,van,Restricted,true,0,No Stopping
 invalid-3.png,MON,12:00,sedan,Restricted,true,0,No Stopping side
 invalid-4.png,MON,12:00,sedan,Restricted,true,0,No Stopping
 invalid-5.png,MON,12:00,sedan,Restricted,true,0,No Stopping
@@ -13,13 +13,13 @@ invalid-6.png,MON,12:00,sedan,Restricted,true,0,No Stopping side
 invalid-7.png,MON,12:00,sedan,Restricted,true,0,No Stopping
 invalid-8.png,MON,12:00,sedan,Restricted,true,0,Bus Zone for an ordinary sedan
 invalid-9.png,MON,12:00,sedan,Restricted,true,0,No Stopping
-invalid-10.png,MON,12:00,sedan,Restricted,true,0,No Stopping
+invalid-10.png,MON,12:00,truck,Restricted,true,0,No Stopping
 invalid-11.png,MON,12:00,sedan,Restricted,true,0,No Stopping
 invalid-12.png,MON,12:00,sedan,Restricted,true,0,No Stopping
 invalid-13.png,MON,12:00,sedan,Restricted,true,0,Clearway at all times
 invalid-14.png,MON,12:00,sedan,Restricted,true,0,No Stopping
 invalid-15.png,MON,12:00,sedan,Restricted,true,0,Taxi Zone side for an ordinary sedan
-valid-1.png,MON,07:00,sedan,Allowed,false,,Before posted hours
+valid-1.png,MON,07:00,motorcycle,Allowed,false,,Before posted hours
 valid-2.png,MON,07:00,sedan,Allowed,false,,Before posted hours
 valid-3.png,MON,07:00,sedan,Allowed,false,,Before posted hours
 valid-4.png,MON,07:00,sedan,Allowed,false,,Before posted hours
@@ -28,11 +28,11 @@ valid-1.png,MON,23:00,sedan,Allowed,false,,After posted hours
 valid-2.png,MON,23:00,sedan,Allowed,false,,After posted hours
 valid-3.png,MON,23:00,sedan,Allowed,false,,After posted hours
 valid-4.png,MON,23:00,sedan,Allowed,false,,After posted hours
-valid-5.png,MON,23:00,sedan,Allowed,false,,After posted hours
+valid-5.png,MON,23:00,van,Allowed,false,,After posted hours
 valid-4.png,TUE,12:00,sedan,Allowed,true,120,Tuesday is within Monday-Friday
 valid-5.png,SAT,12:00,sedan,Allowed,true,120,Saturday is within Monday-Saturday
 valid-4.png,SUN,12:00,sedan,Allowed,false,,Sunday is outside Monday-Friday
 valid-5.png,SUN,12:00,sedan,Allowed,false,,Sunday is outside Monday-Saturday
-invalid-1.png,SUN,12:00,sedan,Restricted,true,0,No Stopping with no posted days
+invalid-1.png,SUN,12:00,truck,Restricted,true,0,No Stopping with no posted days
 invalid-13.png,SUN,12:00,sedan,Restricted,true,0,Clearway at all times
 valid-2.png,SUN,12:00,sedan,Allowed,true,120,2P during posted hours with no posted days

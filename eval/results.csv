@@ -1,0 +1,38 @@
+image,day,time,vehicle,expected_status,expected_active,expected_max_stay_minutes,basis,actual_status,actual_active,actual_max_stay_minutes,exact_match,mismatched_fields,reason
+valid-1.png,MON,12:00,sedan,Allowed,true,60,1P meter sign during posted hours,Check Sign,false,,False,"status, active, max_stay_minutes",Couldn't read the operating hours.
+valid-2.png,MON,12:00,sedan,Allowed,true,120,2P sign during posted hours,Allowed,true,120,True,,Timed parking active: parking permitted up to 120 minutes.
+valid-3.png,MON,12:00,van,Allowed,true,120,2P sign during posted hours,Check Sign,false,,False,"status, active, max_stay_minutes",Couldn't read the operating hours.
+valid-4.png,MON,12:00,sedan,Allowed,true,120,2P sign during posted hours,Check Sign,false,,False,"status, active, max_stay_minutes",Couldn't read the operating hours.
+valid-5.png,MON,12:00,sedan,Allowed,true,120,2P sign during posted hours,Check Sign,false,,False,"status, active, max_stay_minutes",Couldn't read the operating hours.
+invalid-1.png,MON,12:00,sedan,Restricted,true,0,No Stopping,Restricted,true,0,True,,No Stopping active; stopping prohibited.
+invalid-2.png,MON,12:00,van,Restricted,true,0,No Stopping,Restricted,true,0,True,,No Stopping active; stopping prohibited.
+invalid-3.png,MON,12:00,sedan,Restricted,true,0,No Stopping side,Check Sign,false,,False,"status, active, max_stay_minutes",Couldn't read 1 of 1 sign panels.
+invalid-4.png,MON,12:00,sedan,Restricted,true,0,No Stopping,Restricted,true,0,True,,No Stopping active; stopping prohibited.
+invalid-5.png,MON,12:00,sedan,Restricted,true,0,No Stopping,Restricted,true,0,True,,No Stopping active; stopping prohibited.
+invalid-6.png,MON,12:00,sedan,Restricted,true,0,No Stopping side,Check Sign,false,,False,"status, active, max_stay_minutes",Couldn't read 1 of 1 sign panels.
+invalid-7.png,MON,12:00,sedan,Restricted,true,0,No Stopping,Restricted,true,0,True,,No Stopping active; stopping prohibited.
+invalid-8.png,MON,12:00,sedan,Restricted,true,0,Bus Zone for an ordinary sedan,Restricted,true,0,True,,Bus Zone active; stopping prohibited.
+invalid-9.png,MON,12:00,sedan,Restricted,true,0,No Stopping,Restricted,true,0,True,,No Stopping active; stopping prohibited.
+invalid-10.png,MON,12:00,truck,Restricted,true,0,No Stopping,Restricted,true,0,True,,No Stopping active; stopping prohibited.
+invalid-11.png,MON,12:00,sedan,Restricted,true,0,No Stopping,Restricted,true,0,True,,No Stopping active; stopping prohibited.
+invalid-12.png,MON,12:00,sedan,Restricted,true,0,No Stopping,Check Sign,false,,False,"status, active, max_stay_minutes",Couldn't read 1 of 1 sign panels.
+invalid-13.png,MON,12:00,sedan,Restricted,true,0,Clearway at all times,Restricted,true,0,True,,Clearway active; no stopping allowed.
+invalid-14.png,MON,12:00,sedan,Restricted,true,0,No Stopping,Restricted,true,0,True,,No Stopping active; stopping prohibited.
+invalid-15.png,MON,12:00,sedan,Restricted,true,0,Taxi Zone side for an ordinary sedan,Check Sign,false,,False,"status, active, max_stay_minutes",Couldn't read 1 of 1 sign panels.
+valid-1.png,MON,07:00,motorcycle,Allowed,false,,Before posted hours,Check Sign,false,,False,status,Couldn't read the operating hours.
+valid-2.png,MON,07:00,sedan,Allowed,false,,Before posted hours,Allowed,false,,True,,No active restrictions; parking allowed.
+valid-3.png,MON,07:00,sedan,Allowed,false,,Before posted hours,Check Sign,false,,False,status,Couldn't read the operating hours.
+valid-4.png,MON,07:00,sedan,Allowed,false,,Before posted hours,Check Sign,false,,False,status,Couldn't read the operating hours.
+valid-5.png,MON,07:00,sedan,Allowed,false,,Before posted hours,Check Sign,false,,False,status,Couldn't read the operating hours.
+valid-1.png,MON,23:00,sedan,Allowed,false,,After posted hours,Check Sign,false,,False,status,Couldn't read the operating hours.
+valid-2.png,MON,23:00,sedan,Allowed,false,,After posted hours,Allowed,false,,True,,No active restrictions; parking allowed.
+valid-3.png,MON,23:00,sedan,Allowed,false,,After posted hours,Check Sign,false,,False,status,Couldn't read the operating hours.
+valid-4.png,MON,23:00,sedan,Allowed,false,,After posted hours,Check Sign,false,,False,status,Couldn't read the operating hours.
+valid-5.png,MON,23:00,van,Allowed,false,,After posted hours,Check Sign,false,,False,status,Couldn't read the operating hours.
+valid-4.png,TUE,12:00,sedan,Allowed,true,120,Tuesday is within Monday-Friday,Check Sign,false,,False,"status, active, max_stay_minutes",Couldn't read the operating hours.
+valid-5.png,SAT,12:00,sedan,Allowed,true,120,Saturday is within Monday-Saturday,Check Sign,false,,False,"status, active, max_stay_minutes",Couldn't read the operating hours.
+valid-4.png,SUN,12:00,sedan,Allowed,false,,Sunday is outside Monday-Friday,Check Sign,false,,False,status,Couldn't read the operating hours.
+valid-5.png,SUN,12:00,sedan,Allowed,false,,Sunday is outside Monday-Saturday,Check Sign,false,,False,status,Couldn't read the operating hours.
+invalid-1.png,SUN,12:00,truck,Restricted,true,0,No Stopping with no posted days,Restricted,true,0,True,,No Stopping active; stopping prohibited.
+invalid-13.png,SUN,12:00,sedan,Restricted,true,0,Clearway at all times,Restricted,true,0,True,,Clearway active; no stopping allowed.
+valid-2.png,SUN,12:00,sedan,Allowed,true,120,2P during posted hours with no posted days,Allowed,true,120,True,,Timed parking active: parking permitted up to 120 minutes.

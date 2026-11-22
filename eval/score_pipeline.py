@@ -66,9 +66,15 @@ def main():
 
     matches = sum(row["exact_match"] for row in results)
     status_matches = sum(row["actual_status"] == row["expected_status"] for row in results)
+    active_matches = sum(row["actual_active"] == row["expected_active"] for row in results)
+    stay_matches = sum(row["actual_max_stay_minutes"] == row["expected_max_stay_minutes"] for row in results)
+    
     print(f"Images: {len({row['image'] for row in results})}")
     print(f"Exact output: {matches}/{len(results)} ({matches / len(results):.1%})")
     print(f"Parking status: {status_matches}/{len(results)} ({status_matches / len(results):.1%})")
+    print(f"Active status: {active_matches}/{len(results)} ({active_matches / len(results):.1%})")
+    print(f"Max stay minutes: {stay_matches}/{len(results)} ({stay_matches / len(results):.1%})")
+
     print(f"Results: {args.output}")
 
 
